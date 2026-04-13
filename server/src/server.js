@@ -11,7 +11,10 @@ const PORT = process.env.PORT || 5000;
 
 // ✅ APPLY CORS FIRST
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: [
+    "http://localhost:5173",
+    "https://hirewise-47ji.onrender.com"
+  ],
   credentials: true,
 }));
 

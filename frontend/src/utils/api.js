@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://hirewise-47ji.onrender.com/api";
 
 export const apiRequest = async (url, method = "GET", body = null) => {
   const token = localStorage.getItem("token");
@@ -7,7 +7,7 @@ export const apiRequest = async (url, method = "GET", body = null) => {
     method,
     headers: {
       "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
+      Authorization: `Bearer ${token}`,
     },
     body: body ? JSON.stringify(body) : null,
   });
