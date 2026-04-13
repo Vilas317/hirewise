@@ -15,3 +15,9 @@ mongoose.connect(process.env.MONGO_URI)
   .catch((err) => {
     console.error("MongoDB error:", err);
   });
+
+  app._router.stack.forEach(r => {
+    if (r.route && r.route.path) {
+      console.log(r.route.path)
+    }
+  });
