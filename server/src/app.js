@@ -4,7 +4,7 @@ const cors = require("cors");
 const app = express();
 
 const routes = require("./routes");
-const limiter = require("./middleware/ratelimit.middleware");
+const limiter = require("./middleware/rateLimit.middleware")
 const errorHandler = require("./middleware/error.middleware");
 
 // ✅ CORS FIRST
