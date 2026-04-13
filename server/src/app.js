@@ -1,29 +1,30 @@
 const express = require("express");
 const cors = require("cors");
 
+const authRoutes = require("./auth/auth.routes");
+const jobRoutes = require("./routes/job.routes");
+
 const app = express();
 
-const routes = require("./routes");
-const limiter = require("./middleware/rateLimit.middleware")
-const errorHandler = require("./middleware/error.middleware");
+// ✅ BODY PARSER
+app.use(express.json());
 
-// ✅ CORS FIRST
+// ✅ CORS (FIXED HERE)
 app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true
+  origin: [
+    "http://localhost:5173",
+    "https://hirewise-47ji.onrender.com"
+  ],
+  credentials: true,
 }));
 
-app.use(express.json());
+// ✅ ROUTES
+app.use("/api/auth", authRoutes);
+app.use("/api/jobs", jobRoutes);
 
-// 🔐 Rate limiter
-app.use(limiter);
-
-// 📦 Routes
-app.use("/api", routes);
-
-// ❌ Error handler last
-app.use(errorHandler);
-
-app.use(express.json());
+// ✅ TEST ROUTE (optional but useful)
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
 
 module.exports = app;
