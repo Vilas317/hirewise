@@ -1,3 +1,4 @@
+console.log("SERVER FILE RUNNING");
 require("dotenv").config();
 const mongoose = require("mongoose");
 const app = require("./app");
