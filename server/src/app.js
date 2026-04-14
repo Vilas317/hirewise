@@ -2,7 +2,7 @@ const express = require("express");
 const app = express();
 
 const authRoutes = require("./auth/auth.routes");
-const jobRoutes = require("./routes/job.routes"); // ✅ correct
+const jobRoutes = require("./modules/job/job.routes");
 
 app.use(express.json()); // 🔥 REQUIRED
 
