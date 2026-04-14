@@ -41,7 +41,7 @@ const Dashboard = () => {
     setTimeout(() => setToast(""), 2000);
   };
 
-  // ✅ FETCH JOBS
+  // ✅ FETCH JOBS (FIXED)
   const fetchJobs = async () => {
     try {
       setLoading(true);
@@ -51,7 +51,8 @@ const Dashboard = () => {
       console.log("Jobs API response:", data);
 
       if (res.ok) {
-        setJobs(data.jobs || []);
+        // 🔥 FIX HERE
+        setJobs(data.data?.jobs || []);
       } else {
         showToast(data.message || "Failed to fetch jobs");
       }
