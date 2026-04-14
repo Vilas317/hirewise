@@ -5,18 +5,19 @@ const app = express();
 const authRoutes = require("./auth/auth.routes");
 const jobRoutes = require("./modules/job/job.routes");
 
+// 🔥 TEMP FIX (ALLOW ALL ORIGINS)
 app.use(
   cors({
-    origin: true, // ✅ allow all origins (safe for dev/demo)
+    origin: true,
     credentials: true,
   })
 );
-app.use(express.json()); // 🔥 REQUIRED
+
+app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
 
-// TEST ROUTE
 app.get("/test", (req, res) => {
   res.json({ msg: "working" });
 });
