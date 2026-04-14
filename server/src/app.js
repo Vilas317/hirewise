@@ -7,7 +7,10 @@ const jobRoutes = require("./modules/job/job.routes");
 
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://hirewise-nqlnngmf5-vilas-projects-3a847eb8.vercel.app"
+    ],
     credentials: true,
   })
 );
