@@ -41,13 +41,19 @@ const Dashboard = () => {
     setTimeout(() => setToast(""), 2000);
   };
 
+  // ✅ FETCH JOBS
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const { res, data } = await apiRequest("/jobs");
+
+      const { res, data } = await apiRequest("jobs");
+
+      console.log("Jobs API response:", data);
 
       if (res.ok) {
-        setJobs(data?.data?.jobs || []);
+        setJobs(data.jobs || []);
+      } else {
+        showToast(data.message || "Failed to fetch jobs");
       }
     } catch (err) {
       console.error(err);
@@ -61,6 +67,7 @@ const Dashboard = () => {
     fetchJobs();
   }, []);
 
+  // ✅ FILTERING
   useEffect(() => {
     let temp = [...jobs];
 
@@ -78,41 +85,55 @@ const Dashboard = () => {
     setPage(1);
   }, [search, filterStatus, jobs]);
 
+  // ✅ CREATE / UPDATE
   const handleCreateOrUpdate = async () => {
     if (!title.trim() || !company.trim()) {
       showToast("Fill all fields");
       return;
     }
 
-    if (editingJob) {
-      const { res } = await apiRequest(`/jobs/${editingJob._id}`, "PUT", {
-        title,
-        company,
-        status,
-      });
+    try {
+      let res;
 
-      if (res.ok) {
-        showToast("Updated");
-        setEditingJob(null);
-      }
-    } else {
-      const { res } = await apiRequest("/jobs", "POST", {
-        title,
-        company,
-        status,
-      });
+      if (editingJob) {
+        ({ res } = await apiRequest(`jobs/${editingJob._id}`, "PUT", {
+          title,
+          company,
+          status,
+        }));
 
-      if (res.ok) {
-        showToast("Added");
+        if (res.ok) {
+          showToast("Updated");
+          setEditingJob(null);
+        } else {
+          showToast("Update failed");
+        }
+      } else {
+        ({ res } = await apiRequest("jobs", "POST", {
+          title,
+          company,
+          status,
+        }));
+
+        if (res.ok) {
+          showToast("Added");
+        } else {
+          showToast("Add failed");
+        }
       }
+
+      setTitle("");
+      setCompany("");
+      setStatus("applied");
+
+      fetchJobs();
+    } catch (err) {
+      console.error(err);
+      showToast("Something went wrong");
     }
-
-    setTitle("");
-    setCompany("");
-    setStatus("applied");
-    fetchJobs();
   };
 
+  // ✅ EDIT
   const handleEdit = (job) => {
     setEditingJob(job);
     setTitle(job.title);
@@ -120,19 +141,29 @@ const Dashboard = () => {
     setStatus(job.status);
   };
 
+  // ✅ DELETE
   const handleDelete = async (id) => {
-    const { res } = await apiRequest(`/jobs/${id}`, "DELETE");
-    if (res.ok) {
-      showToast("Deleted");
-      fetchJobs();
+    try {
+      const { res } = await apiRequest(`jobs/${id}`, "DELETE");
+
+      if (res.ok) {
+        showToast("Deleted");
+        fetchJobs();
+      } else {
+        showToast("Delete failed");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error deleting job");
     }
   };
 
+  // PAGINATION
   const start = (page - 1) * limit;
   const paginatedJobs = filteredJobs.slice(start, start + limit);
   const totalPages = Math.ceil(filteredJobs.length / limit);
 
-  const total = jobs.length;
+  // CHART DATA
   const applied = jobs.filter((j) => j.status === "applied").length;
   const interview = jobs.filter((j) => j.status === "interview").length;
   const rejected = jobs.filter((j) => j.status === "rejected").length;
@@ -146,10 +177,8 @@ const Dashboard = () => {
   const COLORS = ["#3b82f6", "#facc15", "#ef4444"];
 
   const statusStyle = (status) => {
-    if (status === "applied")
-      return "bg-blue-500 text-white";
-    if (status === "interview")
-      return "bg-yellow-400 text-black";
+    if (status === "applied") return "bg-blue-500 text-white";
+    if (status === "interview") return "bg-yellow-400 text-black";
     return "bg-red-500 text-white";
   };
 
@@ -161,7 +190,6 @@ const Dashboard = () => {
     <div className={dark ? "bg-gray-900 text-white min-h-screen" : ""}>
       <div className="max-w-5xl mx-auto p-6">
 
-        {/* TOAST */}
         {toast && (
           <div className="fixed top-5 right-5 bg-black text-white px-4 py-2 rounded shadow">
             {toast}
@@ -210,7 +238,7 @@ const Dashboard = () => {
           </select>
         </div>
 
-        {/* ADD / EDIT */}
+        {/* ADD */}
         <div className="flex gap-2 mb-6">
           <input
             placeholder="Title"
@@ -258,11 +286,7 @@ const Dashboard = () => {
                   <h3 className="font-bold">{job.title}</h3>
                   <p>{job.company}</p>
 
-                  <span
-                    className={`px-2 py-1 text-xs rounded ${statusStyle(
-                      job.status
-                    )}`}
-                  >
+                  <span className={`px-2 py-1 text-xs rounded ${statusStyle(job.status)}`}>
                     {job.status}
                   </span>
                 </div>
@@ -287,43 +311,6 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* PAGINATION */}
-        <div className="flex gap-2 mt-4">
-          {[...Array(totalPages)].map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i + 1)}
-              className={`px-3 py-1 border rounded ${
-                page === i + 1 ? "bg-black text-white" : ""
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
-
-        {/* CHARTS */}
-        <div className="grid grid-cols-2 gap-6 mt-10">
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={chartData}>
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
-
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie data={chartData} dataKey="value" label>
-                {chartData.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
       </div>
     </div>
   );

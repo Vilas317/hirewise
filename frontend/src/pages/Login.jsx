@@ -18,16 +18,21 @@ const Login = () => {
   }, [userToken]);
 
   const handleLogin = async () => {
-    const { res, data } = await apiRequest("/auth/login", "POST", {
-      email,
-      password,
-    });
-
-    if (res.ok) {
-      login(data.token);
-      navigate("/dashboard");
-    } else {
-      alert(data.message);
+    try {
+      const { res, data } = await apiRequest("auth/login", "POST", {
+        email,
+        password,
+      });
+  
+      if (res.ok) {
+        login(data.token);
+        navigate("/dashboard");
+      } else {
+        alert(data.message);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong");
     }
   };
 

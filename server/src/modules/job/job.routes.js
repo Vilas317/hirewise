@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const jobController = require('./job.controller');
+const jobController = require('../controllers/job.controller');
 const protect = require('../../middleware/auth.middleware');
 const validate = require('../../middleware/validate.middleware');
 const { createJobSchema } = require('../../validators/job.validator');

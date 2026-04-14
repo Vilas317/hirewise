@@ -1,7 +1,8 @@
+console.log("🔥 JOB ROUTES LOADED");
 const express = require("express");
 const router = express.Router();
 
-const jobController = require("../modules/job/job.controller");
+const jobController = require("../controllers/job.controller"); // ✅ correct
 const protect = require("../middleware/auth.middleware");
 
 // OPTIONAL (only if file exists)
