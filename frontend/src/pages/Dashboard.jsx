@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import toast, { Toaster } from "react-hot-toast";
 
 import {
   BarChart,
@@ -19,46 +20,37 @@ const Dashboard = () => {
 
   const [jobs, setJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
-  const [dark, setDark] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const [dark, setDark] = useState(false);
 
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
   const [status, setStatus] = useState("applied");
+  const [source, setSource] = useState("LinkedIn");
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
   const [editingJob, setEditingJob] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   const [page, setPage] = useState(1);
   const limit = 5;
 
-  const [toast, setToast] = useState("");
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2000);
-  };
-
-  // ✅ FETCH JOBS (FIXED)
+  // FETCH
   const fetchJobs = async () => {
     try {
       setLoading(true);
-
       const { res, data } = await apiRequest("jobs");
 
-      console.log("Jobs API response:", data);
-
       if (res.ok) {
-        // 🔥 FIX HERE
         setJobs(data.data?.jobs || []);
       } else {
-        showToast(data.message || "Failed to fetch jobs");
+        toast.error("Failed to fetch jobs");
       }
-    } catch (err) {
-      console.error(err);
-      showToast("Error fetching jobs");
+    } catch {
+      toast.error("Error fetching jobs");
     } finally {
       setLoading(false);
     }
@@ -68,7 +60,7 @@ const Dashboard = () => {
     fetchJobs();
   }, []);
 
-  // ✅ FILTERING
+  // FILTER
   useEffect(() => {
     let temp = [...jobs];
 
@@ -86,77 +78,56 @@ const Dashboard = () => {
     setPage(1);
   }, [search, filterStatus, jobs]);
 
-  // ✅ CREATE / UPDATE
+  // CREATE / UPDATE
   const handleCreateOrUpdate = async () => {
-    if (!title.trim() || !company.trim()) {
-      showToast("Fill all fields");
-      return;
-    }
+    if (!title || !company) return toast.error("Fill all fields");
 
     try {
-      let res;
-
       if (editingJob) {
-        ({ res } = await apiRequest(`jobs/${editingJob._id}`, "PUT", {
+        await apiRequest(`jobs/${editingJob._id}`, "PUT", {
           title,
           company,
           status,
-        }));
-
-        if (res.ok) {
-          showToast("Updated");
-          setEditingJob(null);
-        } else {
-          showToast("Update failed");
-        }
+          source,
+        });
+        toast.success("Updated");
+        setEditingJob(null);
       } else {
-        ({ res } = await apiRequest("jobs", "POST", {
+        await apiRequest("jobs", "POST", {
           title,
           company,
           status,
-        }));
-
-        if (res.ok) {
-          showToast("Added");
-        } else {
-          showToast("Add failed");
-        }
+          source,
+        });
+        toast.success("Added");
       }
 
       setTitle("");
       setCompany("");
       setStatus("applied");
-
+      setSource("LinkedIn");
+      setShowModal(false);
       fetchJobs();
-    } catch (err) {
-      console.error(err);
-      showToast("Something went wrong");
+    } catch {
+      toast.error("Error");
     }
   };
 
-  // ✅ EDIT
   const handleEdit = (job) => {
     setEditingJob(job);
     setTitle(job.title);
     setCompany(job.company);
     setStatus(job.status);
+    setSource(job.source || "LinkedIn");
+    setShowModal(true);
   };
 
-  // ✅ DELETE
   const handleDelete = async (id) => {
-    try {
-      const { res } = await apiRequest(`jobs/${id}`, "DELETE");
+    if (!window.confirm("Are you sure you want to delete this job?")) return;
 
-      if (res.ok) {
-        showToast("Deleted");
-        fetchJobs();
-      } else {
-        showToast("Delete failed");
-      }
-    } catch (err) {
-      console.error(err);
-      showToast("Error deleting job");
-    }
+    await apiRequest(`jobs/${id}`, "DELETE");
+    toast.success("Deleted");
+    fetchJobs();
   };
 
   // PAGINATION
@@ -164,10 +135,11 @@ const Dashboard = () => {
   const paginatedJobs = filteredJobs.slice(start, start + limit);
   const totalPages = Math.ceil(filteredJobs.length / limit);
 
-  // CHART DATA
-  const applied = jobs.filter((j) => j.status === "applied").length;
-  const interview = jobs.filter((j) => j.status === "interview").length;
-  const rejected = jobs.filter((j) => j.status === "rejected").length;
+  // KPI DATA
+  const total = jobs.length;
+  const applied = jobs.filter(j => j.status === "applied").length;
+  const interview = jobs.filter(j => j.status === "interview").length;
+  const rejected = jobs.filter(j => j.status === "rejected").length;
 
   const chartData = [
     { name: "Applied", value: applied },
@@ -178,55 +150,93 @@ const Dashboard = () => {
   const COLORS = ["#3b82f6", "#facc15", "#ef4444"];
 
   const statusStyle = (status) => {
-    if (status === "applied") return "bg-blue-500 text-white";
-    if (status === "interview") return "bg-yellow-400 text-black";
-    return "bg-red-500 text-white";
+    if (status === "applied") return "bg-blue-100 text-blue-600";
+    if (status === "interview") return "bg-yellow-100 text-yellow-700";
+    return "bg-red-100 text-red-600";
   };
 
   if (loading) {
-    return <p className="text-center mt-10">Loading...</p>;
+    return (
+      <div className="p-6">
+        <p>Loading dashboard...</p>
+      </div>
+    );
   }
 
   return (
-    <div className={dark ? "bg-gray-900 text-white min-h-screen" : ""}>
-      <div className="max-w-5xl mx-auto p-6">
+    <div className={dark ? "bg-gray-900 text-white min-h-screen" : "bg-gray-100 min-h-screen"}>
+      <Toaster />
 
-        {toast && (
-          <div className="fixed top-5 right-5 bg-black text-white px-4 py-2 rounded shadow">
-            {toast}
-          </div>
-        )}
+      <div className="max-w-6xl mx-auto p-6">
 
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">HireWise Dashboard</h1>
 
           <div className="flex gap-2">
-            <button
-              onClick={() => setDark(!dark)}
-              className="bg-gray-700 text-white px-3 py-1 rounded"
-            >
-              Toggle
+            <button onClick={() => setDark(!dark)} className="bg-gray-700 px-3 py-1 rounded text-white">
+              🌙
             </button>
-
-            <button
-              onClick={logout}
-              className="bg-red-500 text-white px-3 py-1 rounded"
-            >
+            <button onClick={logout} className="bg-red-500 px-3 py-1 rounded text-white">
               Logout
             </button>
+          </div>
+        </div>
+
+        {/* KPI CARDS */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded shadow text-center">
+            <p>Total</p>
+            <h2 className="text-xl font-bold">{total}</h2>
+          </div>
+          <div className="bg-blue-100 p-4 rounded text-center">
+            <p>Applied</p>
+            <h2 className="font-bold">{applied}</h2>
+          </div>
+          <div className="bg-yellow-100 p-4 rounded text-center">
+            <p>Interview</p>
+            <h2 className="font-bold">{interview}</h2>
+          </div>
+          <div className="bg-red-100 p-4 rounded text-center">
+            <p>Rejected</p>
+            <h2 className="font-bold">{rejected}</h2>
+          </div>
+        </div>
+
+        {/* CHARTS */}
+        <div className="grid md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-white p-4 rounded shadow">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="bg-white p-4 rounded shadow">
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={chartData} dataKey="value" outerRadius={70}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={index} fill={COLORS[index]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
         {/* SEARCH */}
         <div className="flex gap-2 mb-4">
           <input
-            placeholder="Search..."
+            placeholder="Search jobs..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="border p-2 rounded w-full"
           />
-
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
@@ -237,80 +247,109 @@ const Dashboard = () => {
             <option value="interview">Interview</option>
             <option value="rejected">Rejected</option>
           </select>
-        </div>
 
-        {/* ADD */}
-        <div className="flex gap-2 mb-6">
-          <input
-            placeholder="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="border p-2 rounded w-full"
-          />
-
-          <input
-            placeholder="Company"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-            className="border p-2 rounded w-full"
-          />
-
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="border p-2 rounded"
-          >
-            <option value="applied">Applied</option>
-            <option value="interview">Interview</option>
-            <option value="rejected">Rejected</option>
-          </select>
-
-          <button
-            onClick={handleCreateOrUpdate}
-            className="bg-black text-white px-4 rounded"
-          >
-            {editingJob ? "Update" : "Add"}
+          <button onClick={() => setShowModal(true)} className="bg-black text-white px-4 rounded">
+            + Add
           </button>
         </div>
 
+        {/* EMPTY STATE */}
+        {filteredJobs.length === 0 && (
+          <p className="text-center text-gray-500 mt-10">
+            No jobs yet — add your first job 🚀
+          </p>
+        )}
+
         {/* JOB LIST */}
         <div className="space-y-4">
-          {paginatedJobs.length === 0 ? (
-            <p>No jobs found</p>
-          ) : (
-            paginatedJobs.map((job) => (
-              <div
-                key={job._id}
-                className="p-4 border rounded flex justify-between items-center shadow"
-              >
-                <div>
-                  <h3 className="font-bold">{job.title}</h3>
-                  <p>{job.company}</p>
-
-                  <span className={`px-2 py-1 text-xs rounded ${statusStyle(job.status)}`}>
-                    {job.status}
-                  </span>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(job)}
-                    className="bg-blue-500 text-white px-2 py-1 rounded"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => handleDelete(job._id)}
-                    className="bg-red-500 text-white px-2 py-1 rounded"
-                  >
-                    Delete
-                  </button>
-                </div>
+          {paginatedJobs.map((job) => (
+            <div key={job._id} className="bg-white p-4 rounded shadow flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-lg">{job.title}</h3>
+                <p className="text-gray-500">{job.company}</p>
+                <p className="text-xs text-gray-400">{job.source}</p>
+                <span className={`text-xs px-2 py-1 rounded ${statusStyle(job.status)}`}>
+                  {job.status}
+                </span>
               </div>
-            ))
-          )}
+
+              <div className="flex gap-2">
+                <button onClick={() => handleEdit(job)} className="bg-blue-500 text-white px-3 py-1 rounded">
+                  Edit
+                </button>
+                <button onClick={() => handleDelete(job._id)} className="bg-red-500 text-white px-3 py-1 rounded">
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
+
+        {/* PAGINATION */}
+        <div className="flex justify-center mt-6 gap-2">
+          <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-3 py-1 bg-gray-300 rounded">
+            Prev
+          </button>
+          <span>{page} / {totalPages}</span>
+          <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1 bg-gray-300 rounded">
+            Next
+          </button>
+        </div>
+
+        {/* MODAL */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+            <div className="bg-white p-6 rounded shadow w-96">
+              <h2 className="text-xl font-bold mb-4">
+                {editingJob ? "Edit Job" : "Add Job"}
+              </h2>
+
+              <input
+                placeholder="Title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="border p-2 mb-2 w-full"
+              />
+
+              <input
+                placeholder="Company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                className="border p-2 mb-2 w-full"
+              />
+
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="border p-2 mb-2 w-full"
+              >
+                <option value="applied">Applied</option>
+                <option value="interview">Interview</option>
+                <option value="rejected">Rejected</option>
+              </select>
+
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                className="border p-2 mb-4 w-full"
+              >
+                <option>LinkedIn</option>
+                <option>Referral</option>
+                <option>Careers Page</option>
+              </select>
+
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setShowModal(false)} className="px-3 py-1 border rounded">
+                  Cancel
+                </button>
+
+                <button onClick={handleCreateOrUpdate} className="bg-black text-white px-4 py-1 rounded">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
