@@ -18,6 +18,11 @@ const jobSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    source: {
+      type: String,
+      trim: true,
+      default: "Other",
+    },
     description: {
       type: String,
       trim: true,

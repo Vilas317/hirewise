@@ -27,7 +27,7 @@ const Dashboard = () => {
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
   const [status, setStatus] = useState("applied");
-  const [source, setSource] = useState("LinkedIn");
+  //const [source, setSource] = useState("LinkedIn");
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -88,7 +88,7 @@ const Dashboard = () => {
           title,
           company,
           status,
-          source,
+          //source,
         });
         toast.success("Updated");
         setEditingJob(null);
@@ -97,7 +97,7 @@ const Dashboard = () => {
           title,
           company,
           status,
-          source,
+          //source,
         });
         toast.success("Added");
       }
@@ -105,7 +105,7 @@ const Dashboard = () => {
       setTitle("");
       setCompany("");
       setStatus("applied");
-      setSource("LinkedIn");
+      //setSource("LinkedIn");
       setShowModal(false);
       fetchJobs();
     } catch {
@@ -118,7 +118,7 @@ const Dashboard = () => {
     setTitle(job.title);
     setCompany(job.company);
     setStatus(job.status);
-    setSource(job.source || "LinkedIn");
+    //setSource(job.source || "LinkedIn");
     setShowModal(true);
   };
 
@@ -267,7 +267,7 @@ const Dashboard = () => {
               <div>
                 <h3 className="font-bold text-lg">{job.title}</h3>
                 <p className="text-gray-500">{job.company}</p>
-                <p className="text-xs text-gray-400">{job.source}</p>
+                
                 <span className={`text-xs px-2 py-1 rounded ${statusStyle(job.status)}`}>
                   {job.status}
                 </span>
@@ -328,7 +328,7 @@ const Dashboard = () => {
                 <option value="rejected">Rejected</option>
               </select>
 
-              <select
+              {/* <select
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
                 className="border p-2 mb-4 w-full"
@@ -336,7 +336,7 @@ const Dashboard = () => {
                 <option>LinkedIn</option>
                 <option>Referral</option>
                 <option>Careers Page</option>
-              </select>
+              </select> */}
 
               <div className="flex justify-end gap-2">
                 <button onClick={() => setShowModal(false)} className="px-3 py-1 border rounded">

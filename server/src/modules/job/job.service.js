@@ -3,17 +3,13 @@ const mongoose = require('mongoose');
 
 // CREATE
 const createJob = async (data, userId) => {
-  const { title, company, status } = data;
-
-  if (!title || !company || !status) {
-    throw new Error("All fields are required");
-  }
-
-  return await Job.create({
-    title,
-    company,
-    status,
+  return Job.create({
     userId,
+    title: data.title,
+    company: data.company,
+    source: data.source,
+    description: data.description,
+    status: data.status,
   });
 };
 
