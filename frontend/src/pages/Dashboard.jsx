@@ -36,20 +36,31 @@ const Dashboard = () => {
   const [showModal, setShowModal] = useState(false);
 
   const [page, setPage] = useState(1);
-  const limit = 5;
+  const [totalPages, setTotalPages] = useState(1);
 
   // FETCH
-  const fetchJobs = async () => {
+  const fetchJobs = async (currentPage = page) => {
     try {
       setLoading(true);
-      const { res, data } = await apiRequest("jobs");
+
+      const { res, data } = await apiRequest(
+        `jobs?page=${currentPage}&limit=5`
+      );
+
+      console.log("API RESPONSE:", data);
 
       if (res.ok) {
         setJobs(data.data?.jobs || []);
-      } else {
-        toast.error("Failed to fetch jobs");
+        setFilteredJobs(data.data?.jobs || []);
+
+        setTotalPages(
+          data.pagination?.pages || 1
+        );
+      } else if (res.status !== 401) {
+        toast.error(data.message || "Failed to fetch jobs");
       }
-    } catch {
+    } catch (error) {
+      console.error(error);
       toast.error("Error fetching jobs");
     } finally {
       setLoading(false);
@@ -57,8 +68,8 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchJobs();
-  }, []);
+    fetchJobs(page);
+  }, [page]);
 
   // FILTER
   useEffect(() => {
@@ -75,8 +86,11 @@ const Dashboard = () => {
     }
 
     setFilteredJobs(temp);
-    setPage(1);
   }, [search, filterStatus, jobs]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterStatus]);
 
   // CREATE / UPDATE
   const handleCreateOrUpdate = async () => {
@@ -130,11 +144,6 @@ const Dashboard = () => {
     fetchJobs();
   };
 
-  // PAGINATION
-  const start = (page - 1) * limit;
-  const paginatedJobs = filteredJobs.slice(start, start + limit);
-  const totalPages = Math.ceil(filteredJobs.length / limit);
-
   // KPI DATA
   const total = jobs.length;
   const applied = jobs.filter(j => j.status === "applied").length;
@@ -162,6 +171,10 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  console.log("PAGE:", page);
+  console.log("TOTAL PAGES:", totalPages);
+  console.log("JOBS:", jobs.length);
 
   return (
     <div className={dark ? "bg-gray-900 text-white min-h-screen" : "bg-gray-100 min-h-screen"}>
@@ -262,12 +275,12 @@ const Dashboard = () => {
 
         {/* JOB LIST */}
         <div className="space-y-4">
-          {paginatedJobs.map((job) => (
+          {filteredJobs.map((job) => (
             <div key={job._id} className="bg-white p-4 rounded shadow flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-lg">{job.title}</h3>
                 <p className="text-gray-500">{job.company}</p>
-                
+
                 <span className={`text-xs px-2 py-1 rounded ${statusStyle(job.status)}`}>
                   {job.status}
                 </span>
@@ -287,11 +300,23 @@ const Dashboard = () => {
 
         {/* PAGINATION */}
         <div className="flex justify-center mt-6 gap-2">
-          <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-3 py-1 bg-gray-300 rounded">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage((prev) => prev - 1)}
+            className="px-3 py-1 bg-gray-300 rounded disabled:opacity-50"
+          >
             Prev
           </button>
-          <span>{page} / {totalPages}</span>
-          <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1 bg-gray-300 rounded">
+
+          <span className="font-semibold">
+            {page} / {totalPages}
+          </span>
+
+          <button
+            disabled={page >= totalPages}
+            onClick={() => setPage((prev) => prev + 1)}
+            className="px-3 py-1 bg-gray-300 rounded disabled:opacity-50"
+          >
             Next
           </button>
         </div>
