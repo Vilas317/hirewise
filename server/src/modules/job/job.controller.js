@@ -17,7 +17,7 @@ const createJob = asyncHandler(async (req, res) => {
 
 // GET
 const getJobs = asyncHandler(async (req, res) => {
-  const data = await jobService.getJobs(req.user.id, req.query);
+  const data = await jobService.getJobs(req.user.id, req.validatedQuery || req.query);
 
   logger.info(`User ${req.user.id} fetched jobs | query: ${JSON.stringify(req.query)}`);
 
@@ -26,7 +26,9 @@ const getJobs = asyncHandler(async (req, res) => {
     count: data.total,
     pagination: {
       page: data.page,
+      limit: data.limit,
       pages: data.pages,
+      total: data.total,
     },
     data: {
       jobs: data.jobs,

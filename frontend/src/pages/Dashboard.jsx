@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiRequest } from "../utils/api";
 import toast, { Toaster } from "react-hot-toast";
@@ -21,30 +21,44 @@ function formatDate(value) {
 export default function Dashboard() {
   const { logout } = useAuth();
   const [jobs,setJobs] = useState([]); const [loading,setLoading] = useState(true); const [page,setPage] = useState(1); const [totalPages,setTotalPages] = useState(1);
-  const [search,setSearch] = useState(""); const [filterStatus,setFilterStatus] = useState("all"); const [modalOpen,setModalOpen] = useState(false); const [editingJob,setEditingJob] = useState(null); const [saving,setSaving] = useState(false); const [dark,setDark] = useState(false); const [mobileNav,setMobileNav] = useState(false); const [menuFor,setMenuFor] = useState(null);
+  const [search,setSearch] = useState(""); const [filterStatus,setFilterStatus] = useState("all"); const [sort,setSort] = useState("newest"); const [stats,setStats] = useState({total:0,applied:0,interview:0,rejected:0}); const [modalOpen,setModalOpen] = useState(false); const [editingJob,setEditingJob] = useState(null); const [saving,setSaving] = useState(false); const [dark,setDark] = useState(false); const [mobileNav,setMobileNav] = useState(false); const [menuFor,setMenuFor] = useState(null);
   const [form,setForm] = useState({title:"",company:"",status:"applied"});
 
   const fetchJobs = useCallback(async (targetPage = page) => {
     setLoading(true);
-    const {res,data} = await apiRequest(`jobs?page=${targetPage}&limit=5`);
-    if (res.ok) { setJobs(data.data?.jobs || []); setTotalPages(Math.max(1,data.pagination?.pages || 1)); }
-    else if (res.status !== 401) toast.error(data.message || "We couldn't load your applications.");
+    const params = new URLSearchParams({ page: String(targetPage), limit: "5", search: search.trim(), sort });
+    if (filterStatus !== "all") params.set("status", filterStatus);
+    const {res,data} = await apiRequest(`jobs?${params.toString()}`);
+    if (res.ok) {
+      setJobs(data.data?.jobs || []);
+      setTotalPages(Math.max(1, data.pagination?.pages || 1));
+    } else if (res.status !== 401) {
+      toast.error(data.message || "We couldn't load your applications.");
+    }
     setLoading(false);
-  },[page]);
-  useEffect(()=>{ fetchJobs(page); },[page,fetchJobs]);
+  }, [search, filterStatus, sort]);
 
-  const filteredJobs = useMemo(()=>jobs.filter(job=>{
-    const term = search.trim().toLowerCase();
-    const matchesText = !term || `${job.title} ${job.company}`.toLowerCase().includes(term);
-    return matchesText && (filterStatus === "all" || job.status === filterStatus);
-  }),[jobs,search,filterStatus]);
+  // Fetch whenever the current page or the active query changes.
+  // Keep page out of fetchJobs dependencies: the requested page is passed
+  // explicitly, so changing pages must not recreate fetchJobs and reset page.
+  useEffect(() => {
+    fetchJobs(page);
+  }, [fetchJobs, page]);
 
-  const counts = useMemo(()=>({
-    total: jobs.length,
-    applied: jobs.filter(j=>j.status === "applied").length,
-    interview: jobs.filter(j=>j.status === "interview").length,
-    rejected: jobs.filter(j=>j.status === "rejected").length,
-  }),[jobs]);
+  // A changed search/filter/sort query should start from the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterStatus, sort]);
+
+  const fetchStats = useCallback(async () => {
+    const {res,data} = await apiRequest("jobs/stats");
+    if (res.ok) setStats(data.data || {total:0,applied:0,interview:0,rejected:0});
+    else if (res.status !== 401) toast.error(data.message || "We couldn't load your statistics.");
+  }, []);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+  const counts = stats;
+  const filteredJobs = jobs;
   const chartData = [{name:"Applied",value:counts.applied,color:"#8a9db5"},{name:"Interview",value:counts.interview,color:"#c49a52"},{name:"Rejected",value:counts.rejected,color:"#c77c79"}];
 
   const openCreate = () => { setEditingJob(null); setForm({title:"",company:"",status:"applied"}); setModalOpen(true); };
@@ -55,13 +69,13 @@ export default function Dashboard() {
     const endpoint = editingJob ? `jobs/${editingJob._id}` : "jobs";
     const {res,data} = await apiRequest(endpoint,editingJob?"PUT":"POST",{title:form.title.trim(),company:form.company.trim(),status:form.status});
     setSaving(false);
-    if (res.ok) { toast.success(editingJob?"Application updated":"Application added"); setModalOpen(false); setEditingJob(null); if (!editingJob && page !== 1) setPage(1); else fetchJobs(page); }
+    if (res.ok) { toast.success(editingJob?"Application updated":"Application added"); setModalOpen(false); setEditingJob(null); if (!editingJob && page !== 1) setPage(1); else fetchJobs(page); fetchStats(); }
     else toast.error(data.message || "Couldn't save this application.");
   };
   const deleteJob = async job => {
     if (!window.confirm(`Delete the ${job.title} application at ${job.company}?`)) return;
     const {res,data} = await apiRequest(`jobs/${job._id}`,"DELETE");
-    if (res.ok) { toast.success("Application deleted"); if (jobs.length === 1 && page > 1) setPage(p=>p-1); else fetchJobs(page); }
+    if (res.ok) { toast.success("Application deleted"); if (jobs.length === 1 && page > 1) setPage(p=>p-1); else fetchJobs(page); fetchStats(); }
     else toast.error(data.message || "Couldn't delete this application.");
     setMenuFor(null);
   };
@@ -82,23 +96,23 @@ export default function Dashboard() {
         <section className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR CAREER, IN FOCUS</div><h1>Good things take <em>momentum.</em></h1><p>Keep your search organized. Your next opportunity starts with one small step.</p></div><button className="primary-button add-button" onClick={openCreate}><Plus size={17}/> Add application</button></section>
 
         <section className="metrics-grid">
-          <article className="metric-card metric-featured"><div className="metric-head"><span>Total applications</span><span className="metric-icon"><BriefcaseBusiness size={17}/></span></div><div className="metric-value">{counts.total}<small>on this page</small></div><div className="metric-foot"><span className="metric-trend"><Activity size={13}/> Your search at a glance</span></div></article>
+          <article className="metric-card metric-featured"><div className="metric-head"><span>Total applications</span><span className="metric-icon"><BriefcaseBusiness size={17}/></span></div><div className="metric-value">{counts.total}<small>across all pages</small></div><div className="metric-foot"><span className="metric-trend"><Activity size={13}/> Your search at a glance</span></div></article>
           <article className="metric-card"><div className="metric-head"><span>Applied</span><span className="metric-dot dot-applied"/></div><div className="metric-value">{counts.applied}</div><div className="metric-foot">Applications sent</div></article>
           <article className="metric-card"><div className="metric-head"><span>Interviews</span><span className="metric-dot dot-interview"/></div><div className="metric-value">{counts.interview}</div><div className="metric-foot">Conversations in progress</div></article>
           <article className="metric-card"><div className="metric-head"><span>Not moving forward</span><span className="metric-dot dot-rejected"/></div><div className="metric-value">{counts.rejected}</div><div className="metric-foot">A step closer to the right fit</div></article>
         </section>
 
         <section className="insights-grid">
-          <article className="panel trend-panel"><div className="panel-heading"><div><span className="panel-kicker">YOUR ACTIVITY</span><h2>Application snapshot</h2></div><span className="panel-icon"><TrendingUp size={17}/></span></div><div className="chart-area">{counts.total===0?<div className="chart-empty"><Target size={23}/><span>Add applications to see your activity.</span></div>:<ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{top:12,right:10,left:-20,bottom:0}}><defs><linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#9aabbd" stopOpacity={0.28}/><stop offset="100%" stopColor="#9aabbd" stopOpacity={0.015}/></linearGradient></defs><CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--chart-grid)"/><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill:"var(--muted)",fontSize:11}}/><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{fill:"var(--muted)",fontSize:11}}/><Tooltip contentStyle={{borderRadius:12,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",fontSize:12}}/><Area type="monotone" dataKey="value" stroke="#8298ae" strokeWidth={2.5} fill="url(#activityFill)"/></AreaChart></ResponsiveContainer>}</div><div className="chart-caption"><span><i className="legend-line"/> Applications by status</span><span>Current page</span></div></article>
+          <article className="panel trend-panel"><div className="panel-heading"><div><span className="panel-kicker">YOUR ACTIVITY</span><h2>Application snapshot</h2></div><span className="panel-icon"><TrendingUp size={17}/></span></div><div className="chart-area">{counts.total===0?<div className="chart-empty"><Target size={23}/><span>Add applications to see your activity.</span></div>:<ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{top:12,right:10,left:-20,bottom:0}}><defs><linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#9aabbd" stopOpacity={0.28}/><stop offset="100%" stopColor="#9aabbd" stopOpacity={0.015}/></linearGradient></defs><CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--chart-grid)"/><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill:"var(--muted)",fontSize:11}}/><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{fill:"var(--muted)",fontSize:11}}/><Tooltip contentStyle={{borderRadius:12,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",fontSize:12}}/><Area type="monotone" dataKey="value" stroke="#8298ae" strokeWidth={2.5} fill="url(#activityFill)"/></AreaChart></ResponsiveContainer>}</div><div className="chart-caption"><span><i className="legend-line"/> Applications by status</span><span>All applications</span></div></article>
           <article className="panel distribution-panel"><div className="panel-heading"><div><span className="panel-kicker">THE BREAKDOWN</span><h2>Where things stand</h2></div><span className="panel-icon"><SlidersHorizontal size={17}/></span></div><div className="distribution-body"><div className="donut-wrap"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chartData} dataKey="value" nameKey="name" innerRadius="68%" outerRadius="88%" paddingAngle={4} stroke="none">{chartData.map((entry,index)=><Cell key={index} fill={entry.color}/>)}</Pie></PieChart></ResponsiveContainer><div className="donut-center"><strong>{counts.total}</strong><span>total</span></div></div><div className="legend-list">{chartData.map(item=><div className="legend-item" key={item.name}><span><i style={{background:item.color}}/>{item.name}</span><strong>{item.value}</strong></div>)}</div></div><div className="distribution-note"><Sparkles size={14}/> Every application is progress.</div></article>
         </section>
 
         <section className="applications-section"><div className="section-heading"><div><span className="panel-kicker">KEEP IT MOVING</span><h2>Your applications</h2><p>A thoughtful record of every opportunity you pursue.</p></div><div className="application-count">{filteredJobs.length} shown <span>·</span> page {page} of {totalPages}</div></div>
-          <div className="table-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search role or company…"/></div><div className="filter-wrap"><SlidersHorizontal size={15}/><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option value="all">All statuses</option>{STATUSES.map(s=><option value={s} key={s}>{STATUS_META[s].label}</option>)}</select><ChevronDown size={14}/></div></div>
+          <div className="table-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search role or company…"/></div><div className="filter-wrap"><SlidersHorizontal size={15}/><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option value="all">All statuses</option>{STATUSES.map(s=><option value={s} key={s}>{STATUS_META[s].label}</option>)}</select><ChevronDown size={14}/></div><div className="filter-wrap"><select aria-label="Sort applications" value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="company_asc">Company A–Z</option><option value="company_desc">Company Z–A</option><option value="title_asc">Role A–Z</option><option value="title_desc">Role Z–A</option></select><ChevronDown size={14}/></div></div>
           <div className="table-card"><div className="table-header"><span>ROLE & COMPANY</span><span>STATUS</span><span>DATE ADDED</span><span/></div>
             {loading?<div className="table-state"><div className="loading-orbit"/><span>Gathering your applications…</span></div>:filteredJobs.length===0?<div className="empty-state"><div className="empty-icon"><BriefcaseBusiness size={23}/></div><h3>{search||filterStatus!=="all"?"No matching applications":"Your next opportunity starts here."}</h3><p>{search||filterStatus!=="all"?"Try another search or clear your filters.":"Add the roles you’re interested in and keep every detail in one calm place."}</p>{!search&&filterStatus==="all"&&<button className="secondary-button" onClick={openCreate}><Plus size={16}/> Add your first application</button>}</div>:filteredJobs.map(job=><div className="job-row" key={job._id}><div className="job-identity"><div className="company-avatar">{(job.company||"?").trim().charAt(0).toUpperCase()}</div><div><strong>{job.title}</strong><span><Building2 size={13}/>{job.company}</span></div></div><div><span className={`status-pill ${STATUS_META[job.status]?.className || "status-applied"}`}><i/>{STATUS_META[job.status]?.label || job.status}</span></div><div className="job-date">{formatDate(job.createdAt || job.updatedAt)}</div><div className="row-actions"><button className="row-menu-button" onClick={()=>setMenuFor(menuFor===job._id?null:job._id)} aria-label="Application actions"><MoreHorizontal size={19}/></button>{menuFor===job._id&&<div className="row-menu"><button onClick={()=>openEdit(job)}><Pencil size={14}/> Edit</button><button className="danger-action" onClick={()=>deleteJob(job)}><Trash2 size={14}/> Delete</button></div>}</div></div>)}
           </div>
-          <div className="pagination"><span>Showing <strong>{filteredJobs.length}</strong> applications on this page</span><div className="pagination-controls"><button disabled={page===1||loading} onClick={()=>setPage(p=>Math.max(1,p-1))}><ChevronLeft size={16}/>Previous</button><span>{page} <i>/</i> {totalPages}</span><button disabled={page>=totalPages||loading} onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>Next<ChevronRight size={16}/></button></div></div>
+          <div className="pagination"><span>Showing <strong>{filteredJobs.length}</strong> applications on this page · {counts.total} total</span><div className="pagination-controls"><button disabled={page===1||loading} onClick={()=>setPage(p=>Math.max(1,p-1))}><ChevronLeft size={16}/>Previous</button><span>{page} <i>/</i> {totalPages}</span><button disabled={page>=totalPages||loading} onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>Next<ChevronRight size={16}/></button></div></div>
         </section>
         <footer className="dashboard-footer"><span>Made for the next chapter.</span><span>HIREWISE <i>·</i> CAREER TRACKER</span></footer>
       </div>

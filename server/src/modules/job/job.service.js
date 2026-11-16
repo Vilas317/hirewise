@@ -1,7 +1,20 @@
 const Job = require('./job.model');
 const mongoose = require('mongoose');
 
-// CREATE
+const SORT_OPTIONS = {
+  newest: { createdAt: -1, _id: -1 },
+  oldest: { createdAt: 1, _id: 1 },
+  company_asc: { company: 1, _id: 1 },
+  company_desc: { company: -1, _id: -1 },
+  title_asc: { title: 1, _id: 1 },
+  title_desc: { title: -1, _id: -1 },
+};
+
+const SORT_COLLATION = {
+  locale: 'en',
+  strength: 2,
+};
+
 const createJob = async (data, userId) => {
   return Job.create({
     userId,
@@ -9,11 +22,10 @@ const createJob = async (data, userId) => {
     company: data.company,
     source: data.source,
     description: data.description,
-    status: data.status,
+    status: data.status || 'applied',
   });
 };
 
-// GET (FILTER + SEARCH + PAGINATION)
 const getJobs = async (userId, query) => {
   const filter = { userId };
 
@@ -22,58 +34,93 @@ const getJobs = async (userId, query) => {
   }
 
   if (query.search) {
-    filter.$text = { $search: query.search };
+    const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escaped, 'i');
+
+    filter.$or = [
+      { title: searchRegex },
+      { company: searchRegex },
+    ];
   }
 
-  const page = parseInt(query.page) || 1;
-  const limit = parseInt(query.limit) || 5;
+  // Validate pagination defensively, even though Joi validates it earlier.
+  const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
+  const limit = Math.min(
+    50,
+    Math.max(1, Number.parseInt(query.limit, 10) || 5)
+  );
+
   const skip = (page - 1) * limit;
 
-  const jobs = await Job.find(filter)
-    .sort({ createdAt: -1 })
+  const sort = SORT_OPTIONS[query.sort] || SORT_OPTIONS.newest;
+
+  const jobsQuery = Job.find(filter)
+    .sort(sort)
     .skip(skip)
     .limit(limit);
 
-  const total = await Job.countDocuments(filter);
+  // Apply case-insensitive collation only to alphabetical sorting.
+  if (['company_asc', 'company_desc', 'title_asc', 'title_desc'].includes(query.sort)) {
+    jobsQuery.collation(SORT_COLLATION);
+  }
+
+  const [jobs, total] = await Promise.all([
+    jobsQuery.exec(),
+    Job.countDocuments(filter),
+  ]);
 
   return {
     jobs,
     total,
     page,
+    limit,
     pages: Math.ceil(total / limit),
   };
 };
 
-// UPDATE
 const updateJob = async (jobId, userId, data) => {
+  if (!mongoose.isValidObjectId(jobId)) {
+    const error = new Error('Invalid application ID.');
+    error.statusCode = 400;
+    throw error;
+  }
+
   const job = await Job.findOneAndUpdate(
     { _id: jobId, userId },
-    data,
-    { new: true }
+    { $set: data },
+    { new: true, runValidators: true }
   );
 
   if (!job) {
-    throw new Error('Job not found or unauthorized');
+    const error = new Error('Application not found.');
+    error.statusCode = 404;
+    throw error;
   }
 
   return job;
 };
 
-// DELETE
 const deleteJob = async (jobId, userId) => {
+  if (!mongoose.isValidObjectId(jobId)) {
+    const error = new Error('Invalid application ID.');
+    error.statusCode = 400;
+    throw error;
+  }
+
   const job = await Job.findOneAndDelete({
     _id: jobId,
     userId,
   });
 
   if (!job) {
-    throw new Error('Job not found or unauthorized');
+    const error = new Error('Application not found.');
+    error.statusCode = 404;
+    throw error;
   }
 
   return job;
 };
 
-// STATS
 const getJobStats = async (userId) => {
   const stats = await Job.aggregate([
     {
@@ -96,9 +143,9 @@ const getJobStats = async (userId) => {
     rejected: 0,
   };
 
-  stats.forEach((item) => {
-    result[item._id] = item.count;
-    result.total += item.count;
+  stats.forEach(({ _id, count }) => {
+    result[_id] = count;
+    result.total += count;
   });
 
   return result;
