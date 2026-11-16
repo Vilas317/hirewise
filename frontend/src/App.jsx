@@ -1,52 +1,26 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { useAuth } from "./context/AuthContext";
-
+import { warmupBackend } from "./utils/api";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import ProtectedRoutes from "./components/ProtectedRoutes";
-import { useEffect } from "react";
-import { warmupBackend } from "./utils/api";
 
 function App() {
   const { userToken } = useAuth();
-
-  useEffect(() => {
-    // Start waking the backend while the user is viewing the login page.
-    // Do not await this: frontend navigation remains immediate.
-    warmupBackend();
-  }, []);
+  useEffect(() => { warmupBackend(); }, []);
 
   return (
     <BrowserRouter>
       <Routes>
-
-        {/* 🔥 ROOT ROUTE FIX */}
-        <Route
-          path="/"
-          element={
-            userToken ? <Navigate to="/dashboard" /> : <Navigate to="/login" />
-          }
-        />
-
+        <Route path="/" element={<Navigate to={userToken ? "/dashboard" : "/login"} replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoutes>
-              <Dashboard />
-            </ProtectedRoutes>
-          }
-        />
-
-        {/* 🔥 OPTIONAL: Catch all */}
-        <Route path="*" element={<Navigate to="/" />} />
-
+        <Route path="/dashboard" element={<ProtectedRoutes><Dashboard /></ProtectedRoutes>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
 }
-
 export default App;
