@@ -1,6 +1,10 @@
 # 🚀 HireWise – Job Application Tracker
 
-A full-stack MERN application to track job applications with authentication, status management, and CRUD operations.
+HireWise is a full-stack job application tracking platform designed to help job seekers organize, manage, and monitor their job search in one centralized place.
+
+Instead of maintaining spreadsheets or manually tracking applications, users can use HireWise to record job applications, monitor application statuses, manage their progress, and gain insights into their job search.
+
+The long-term vision is to transform HireWise from a simple job tracker into a complete job search management platform with interview tracking, reminders, analytics, and AI-powered career assistance.
 
 ---
 
